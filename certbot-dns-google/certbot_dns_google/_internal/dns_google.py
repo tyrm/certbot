@@ -40,6 +40,10 @@ class Authenticator(dns_common.DNSAuthenticator):
                   'information about creating a service account and {1} for information about the' +
                   'required permissions.)').format(ACCT_URL, PERMISSIONS_URL),
             default=None)
+        add('zone-name',
+            help=('Name of the zone in Google Cloud DNS used for dns-01 channel. If ' +
+                  'not provided it will be automatically determined.'),
+            default=None)
 
     def more_info(self): # pylint: disable=missing-function-docstring
         return 'This plugin configures a DNS TXT record to respond to a dns-01 challenge using ' + \
@@ -110,7 +114,9 @@ class _GoogleClient:
         :raises certbot.errors.PluginError: if an error occurs communicating with the Google API
         """
 
-        zone_id = self._find_managed_zone_id(domain)
+        zone_id = self.conf('zone-name')
+        if zone_id is None:
+            zone_id = self._find_managed_zone_id(domain)
 
         record_contents = self.get_existing_txt_rrset(zone_id, record_name)
         if record_contents is None:
@@ -180,7 +186,9 @@ class _GoogleClient:
         """
 
         try:
-            zone_id = self._find_managed_zone_id(domain)
+            zone_id = self.conf('zone-name')
+            if zone_id is None:
+                zone_id = self._find_managed_zone_id(domain)
         except errors.PluginError as e:
             logger.warning('Error finding zone. Skipping cleanup.')
             return
