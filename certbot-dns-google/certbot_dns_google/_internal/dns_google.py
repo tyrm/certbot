@@ -31,6 +31,7 @@ class Authenticator(dns_common.DNSAuthenticator):
     description = ('Obtain certificates using a DNS TXT record (if you are using Google Cloud DNS '
                    'for DNS).')
     ttl = 60
+    zone_override = None
 
     @classmethod
     def add_parser_arguments(cls, add):  # pylint: disable=arguments-differ
@@ -66,11 +67,15 @@ class Authenticator(dns_common.DNSAuthenticator):
 
             dns_common.validate_file_permissions(self.conf('credentials'))
 
+
+        if self.conf('zone-name') is not None:
+            self.zone_override = self.conf('zone-name')
+
     def _perform(self, domain, validation_name, validation):
-        self._get_google_client().add_txt_record(domain, validation_name, validation, self.ttl)
+        self._get_google_client().add_txt_record(domain, validation_name, validation, self.ttl, zone_override)
 
     def _cleanup(self, domain, validation_name, validation):
-        self._get_google_client().del_txt_record(domain, validation_name, validation, self.ttl)
+        self._get_google_client().del_txt_record(domain, validation_name, validation, self.ttl, zone_override)
 
     def _get_google_client(self):
         return _GoogleClient(self.conf('credentials'))
@@ -103,7 +108,7 @@ class _GoogleClient:
         else:
             self.dns = dns_api
 
-    def add_txt_record(self, domain, record_name, record_content, record_ttl):
+    def add_txt_record(self, domain, record_name, record_content, record_ttl, zone_override):
         """
         Add a TXT record using the supplied information.
 
@@ -114,7 +119,7 @@ class _GoogleClient:
         :raises certbot.errors.PluginError: if an error occurs communicating with the Google API
         """
 
-        zone_id = self.conf('zone-name')
+        zone_id = zone_override
         if zone_id is None:
             zone_id = self._find_managed_zone_id(domain)
 
@@ -174,7 +179,7 @@ class _GoogleClient:
             raise errors.PluginError('Error communicating with the Google Cloud DNS API: {0}'
                                      .format(e))
 
-    def del_txt_record(self, domain, record_name, record_content, record_ttl):
+    def del_txt_record(self, domain, record_name, record_content, record_ttl, zone_override):
         """
         Delete a TXT record using the supplied information.
 
@@ -186,7 +191,7 @@ class _GoogleClient:
         """
 
         try:
-            zone_id = self.conf('zone-name')
+            zone_id = zone_override
             if zone_id is None:
                 zone_id = self._find_managed_zone_id(domain)
         except errors.PluginError as e:
